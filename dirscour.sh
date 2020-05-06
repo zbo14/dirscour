@@ -69,8 +69,12 @@ elif [[ "$1" == @* ]]; then
 fi
 
 dirscour="$(realpath "$(dirname "$0")")"
+dirsearch=${dirsearch:-$dirscour/dirsearch.py}
 nprocs=${nprocs:-20}
 output=${output:-$dirscour}
+reports="$output"/reports
+
+mkdir -p "$reports"
 
 cd "$dirscour"
 
@@ -98,12 +102,6 @@ if [ ! -z "$containerize" ]; then
   exit "$?"
 fi
 
-dirsearch=${dirsearch:-$dirscour/dirsearch.py}
-output=${output:-$dirscour}
-reports="$output"/reports
-
-mkdir -p "$reports"
-
 tmp="$(mktemp -d)"
 lock="$tmp"/lock
 subdomains="$tmp"/subdomains
@@ -119,7 +117,7 @@ for i in $(seq 1 "$nprocs"); do
   lock="$lock" \
   reports="$reports" \
   subdomains="$subdomains" \
-  ./daemon.sh "$i" &
+  bash daemon.sh "$i" &
 done
 
 if [ -z "$filename" ]; then
