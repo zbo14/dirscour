@@ -1,5 +1,11 @@
 #!/bin/bash
 
+id="$1"
+
+if [ "$1" -lt 10 ]; then
+  id=0"$id"
+fi
+
 while true; do
   while true; do
     mkdir "$lock" 2> /dev/null && break
@@ -13,7 +19,6 @@ while true; do
   rm -rf "$lock"
 
   if [ "$subdomain" == "done" ]; then
-    echo "[proc#$1] Exiting"
     exit
   elif ! [[ "$subdomain" =~ [0-9A-Za-z]+ ]]; then
     sleep 1."$RANDOM"
@@ -23,12 +28,14 @@ while true; do
   dns="$(dig +short "$subdomain")"
 
   if [[ "$dns" =~ [0-9A-Za-z]+ ]]; then
-    echo "[proc#$1] Scanning \"$subdomain\""
+    echo "[p#$id] Scanning \"$subdomain\""
 
     python3 "$dirsearch" \
       -E \
       -u https://"$subdomain" \
       --plain-text-report="$reports/$subdomain".txt \
       > /dev/null
+
+    echo "[p#$id] Finished \"$subdomain\""
   fi
 done
