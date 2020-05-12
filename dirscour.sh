@@ -71,7 +71,7 @@ fi
 dirscour="$(realpath "$(dirname "$0")")"
 dirsearch=${dirsearch:-$dirscour/dirsearch.py}
 nprocs=${nprocs:-20}
-output=${output:-$dirscour}
+output="$(realpath "${output:-$dirscour}")"
 reports="$output"/reports
 
 mkdir -p "$reports"
