@@ -25,15 +25,16 @@ OPTIONS:
   -d  path to dirsearch directory
   -o  path to output directory
   -p  number of daemon processes to spawn (default: 20)
+  -w  wordlist for web path discovery (default: <dirsearch>/db/dicc.txt)
 ```
 
 `dirscour` maintains a process pool for scanning web paths. When a process finishes scanning one domain, it scans the next (unscanned) domain. You can adjust the size of the process pool with the `-p` option.
 
 If you don't have `amass` or `dirsearch` installed on your machine, you can still use `dirscour`. Just specify the `-c` flag and `dirscour` will run in a [Docker](https://docs.docker.com/get-docker/) container with all the necessary tooling. **Note:** this will build the Docker image if it doesn't exist.
 
-If you already have the tools installed on your machine, you can run `dirscour` without Docker. Specify the `-d` option to point `dirscour` to the directory containing `dirsearch.py`.
+If you already have the tools installed on your machine, you can run `dirscour` without Docker. Specify the `-d` option to point `dirscour` to the directory containing `dirsearch.py`. By default, `dirscour` uses the wordlist, `<dirsearch>/db/dicc.txt`, for discovering web paths; however, you can specify a different wordlist with `-w`.
 
-You can also tell `dirscour` where to write scan results. Just include the `-o` option with the path to the output directory. Web paths for each domain will be written to `<output-directory>/reports/<domain>.txt`.
+You must tell `dirscour` where to write scan results by including the `-o` option with the path to the output directory. Web paths for each domain will be written to `<output-directory>/reports/<domain>.txt`.
 
 ## Contributing
 
