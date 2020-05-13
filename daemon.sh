@@ -30,10 +30,11 @@ while true; do
   if [[ "$dns" =~ [0-9A-Za-z]+ ]]; then
     echo "[p#$id] Scanning \"$subdomain\""
 
-    python3 "$dirsearch" \
+    python3 "$dirsearch"/dirsearch.py \
       -E \
       -u https://"$subdomain" \
       --plain-text-report="$reports/$subdomain".txt \
+      -w "$wordlist" \
       > /dev/null
 
     echo "[p#$id] Finished \"$subdomain\""

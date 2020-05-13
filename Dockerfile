@@ -13,4 +13,5 @@ ENTRYPOINT bash dirscour.sh \
   -d /dirscour/dirsearch \
   -o /dirscour/output \
   -p "$nprocs" \
+  -w "$wordlist" \
   "$target"

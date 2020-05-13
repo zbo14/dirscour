@@ -9,10 +9,14 @@ usage () {
   echo "  -d  path to dirsearch directory"
   echo "  -o  path to output directory"
   echo "  -p  number of daemon processes to spawn (default: 20)"
+  echo "  -w  wordlist for web path discovery (default: <dirsearch>/db/dicc.txt)"
   exit
 }
 
-while getopts ":cd:ho:p:" opt; do
+dirscour="$(realpath "$(dirname "$0")")"
+cd "$dirscour"
+
+while getopts ":cd:ho:p:w:" opt; do
   case ${opt} in
     h)
       usage
@@ -23,19 +27,22 @@ while getopts ":cd:ho:p:" opt; do
       ;;
 
     d)
-      dirsearch="$OPTARG"/dirsearch.py
+      dirsearch="$(realpath "$OPTARG")"
 
-      if [ ! -f "$dirsearch" ]; then
-        echo "Couldn't find file \"$dirsearch\""
+      if [ ! -d "$dirsearch" ]; then
+        echo "Couldn't find dirsearch directory \"$dirsearch\""
+        exit 1
+      elif [ ! -f "$dirsearch"/dirsearch.py ]; then
+        echo "No dirsearch.py file in directory"
         exit 1
       fi
       ;;
 
     o)
-      output="$OPTARG"
+      output="$(realpath "$OPTARG")"
 
       if [ ! -d "$output" ]; then
-        echo "Couldn't find directory \"$output\""
+        echo "Couldn't find output directory \"$output\""
         exit 1
       fi
       ;;
@@ -51,6 +58,16 @@ while getopts ":cd:ho:p:" opt; do
         exit 1
       fi
       ;;
+
+    w)
+      wordlist="$(realpath "$OPTARG")"
+
+      if [ ! -f "$wordlist" ]; then
+        echo "Couldn't find wordlist \"$wordlist\""
+        exit 1
+      fi
+      ;;
+
   esac
 done
 
@@ -66,49 +83,74 @@ elif [[ "$1" == @* ]]; then
     echo "Couldn't find file \"$filename\""
     exit 1
   fi
+elif [ -z "$output" ]; then
+  echo "No output directory specified"
+  exit 1
 fi
 
-dirscour="$(realpath "$(dirname "$0")")"
-dirsearch=${dirsearch:-$dirscour/dirsearch.py}
 nprocs=${nprocs:-20}
-output="$(realpath "${output:-$dirscour}")"
 reports="$output"/reports
 
 mkdir -p "$reports"
-
-cd "$dirscour"
 
 if [ ! -z "$containerize" ]; then
   [ "[]" == "$(docker inspect --type=image dirscour 2> /dev/null)" ] &&
     docker build --no-cache -t dirscour .
 
   if [ -z "$filename" ]; then
+    if [ -z "$wordlist" ]; then
+      docker run \
+        -e nprocs="$nprocs" \
+        -e target="$1" \
+        -e wordlist=/dirscour/dirsearch/db/dicc.txt \
+        --rm \
+        -v "$output":/dirscour/output \
+        dirscour
+    else
+      docker run \
+        -e nprocs="$nprocs" \
+        -e target="$1" \
+        -e wordlist=/dirscour/wordlist \
+        --rm \
+        -v "$output":/dirscour/output \
+        -v "$wordlist":/dirscour/wordlist:ro \
+        dirscour
+    fi
+  elif  [ -z "$wordlist" ]; then
     docker run \
-    -e nprocs="$nprocs" \
-    -e target="$1" \
-    --rm \
-    -v "$output":/dirscour/output \
-    dirscour
+      -e nprocs="$nprocs" \
+      -e target=@/dirscour/domains \
+      -e wordlist=/dirscour/dirsearch/db/dicc.txt \
+      --rm \
+      -v "$filename":/dirscour/domains \
+      -v "$output":/dirscour/output \
+      dirscour
   else
     docker run \
-    -e nprocs="$nprocs" \
-    -e target=@/dirscour/domains \
-    --rm \
-    -v "$filename":/dirscour/domains \
-    -v "$output":/dirscour/output \
-    dirscour
+      -e nprocs="$nprocs" \
+      -e target=@/dirscour/domains \
+      -e wordlist=/dirscour/wordlist \
+      --rm \
+      -v "$filename":/dirscour/domains \
+      -v "$output":/dirscour/output \
+      -v "$wordlist":/dirscour/wordlist:ro \
+      dirscour
   fi
 
   exit "$?"
+elif [ -z "$dirsearch" ]; then
+  echo "No dirsearch directory specified"
+  exit 1
 fi
 
 tmp="$(mktemp -d)"
 lock="$tmp"/lock
 subdomains="$tmp"/subdomains
+wordlist=${wordlist:-"$dirsearch"/db/dicc.txt}
 
 touch "$subdomains"
 
-cat "$dirscour"/banner.ascii
+cat "$dirscour"/banner
 
 echo "[main] Starting daemon processes"
 
@@ -117,6 +159,7 @@ for i in $(seq 1 "$nprocs"); do
   lock="$lock" \
   reports="$reports" \
   subdomains="$subdomains" \
+  wordlist="$wordlist" \
   bash daemon.sh "$i" &
 done
 
@@ -125,7 +168,8 @@ if [ -z "$filename" ]; then
   amass enum -passive -d "$1" >> "$subdomains" 2> /dev/null
   echo "[main] Finished subdomain discovery"
 else
-  cat "$filename" > "$subdomains"
+  echo "[main] Scanning domains in file"
+  cp "$filename" "$subdomains"
 fi
 
 for _ in $(seq 1 "$nprocs"); do
@@ -137,3 +181,5 @@ wait
 echo "[main] Cleaning up"
 
 rm -rf "$tmp"
+
+echo "[main] Done!"
