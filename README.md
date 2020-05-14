@@ -6,7 +6,7 @@ A recon tool for scanning a lot of web paths in parallel!
 
 ## Install
 
-Clone the repo and `cd` into it.
+Clone the repo, `cd` into it, and run `./install.sh`.
 
 ## Usage
 
