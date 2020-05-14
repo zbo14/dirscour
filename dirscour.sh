@@ -13,9 +13,6 @@ usage () {
   exit
 }
 
-dirscour="$(realpath "$(dirname "$0")")"
-cd "$dirscour"
-
 while getopts ":cd:ho:p:w:" opt; do
   case ${opt} in
     h)
@@ -143,6 +140,8 @@ elif [ -z "$dirsearch" ]; then
   exit 1
 fi
 
+
+dirscour="$(realpath "$(dirname "$0")")"
 tmp="$(mktemp -d)"
 lock="$tmp"/lock
 subdomains="$tmp"/subdomains
@@ -150,7 +149,8 @@ wordlist=${wordlist:-"$dirsearch"/db/dicc.txt}
 
 touch "$subdomains"
 
-cat "$dirscour"/banner
+cd "$dirscour"
+cat banner
 
 echo "[main] Starting daemon processes"
 
