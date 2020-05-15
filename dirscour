@@ -1,5 +1,18 @@
 #!/bin/bash
 
+log () {
+  [ -z "$quiet" ] && echo "$1"
+}
+
+banner () {
+  log "___  _ ____ ____ ____ ____ _  _ ____"
+  log "|  \ | |__/ [__  |    |  | |  | |__/"
+  log "|__/ | |  \ ___] |___ |__| |__| |  \\"
+  log ""
+  log "Concocted by zbo14 with 🖤"
+  log ""
+}
+
 usage () {
   echo "USAGE: ./dirscour [OPTIONS] <domain/@file>"
   echo ""
@@ -9,11 +22,55 @@ usage () {
   echo "  -d  path to dirsearch directory"
   echo "  -o  path to output directory"
   echo "  -p  number of daemon processes to spawn (default: 20)"
+  echo "  -q  don\'t print banner or info"
   echo "  -w  wordlist for web path discovery (default: <dirsearch>/db/dicc.txt)"
   exit
 }
 
-while getopts ":cd:ho:p:w:" opt; do
+scanner () {
+  id="$1"
+
+  if [ "$1" -lt 10 ]; then
+    id=0"$id"
+  fi
+
+  while true; do
+    while true; do
+      mkdir "$lock" 2> /dev/null && break
+      sleep 1."$RANDOM"
+    done
+
+    subdomain="$(head -1 "$subdomains")"
+    newsubdomains="$(tail -n +2 "$subdomains")"
+    log "$newsubdomains" > "$subdomains"
+
+    rm -rf "$lock"
+
+    if [ "$subdomain" == "done" ]; then
+      exit
+    elif ! [[ "$subdomain" =~ [0-9A-Za-z]+ ]]; then
+      sleep 1."$RANDOM"
+      continue
+    fi
+
+    dns="$(dig +short "$subdomain")"
+
+    if [[ "$dns" =~ [0-9A-Za-z]+ ]]; then
+     log "[p#$id] Scanning \"$subdomain\""
+
+      python3 "$dirsearch"/dirsearch.py \
+        -E \
+        -u https://"$subdomain" \
+        --plain-text-report="$reports/$subdomain".txt \
+        -w "$wordlist" \
+        > /dev/null
+
+      log "[p#$id] Finished \"$subdomain\""
+    fi
+  done
+}
+
+while getopts ":cd:ho:p:qw:" opt; do
   case ${opt} in
     h)
       usage
@@ -56,6 +113,10 @@ while getopts ":cd:ho:p:w:" opt; do
       fi
       ;;
 
+    q)
+      quiet=1
+      ;;
+
     w)
       wordlist="$(realpath "$OPTARG")"
 
@@ -80,20 +141,15 @@ elif [[ "$1" == @* ]]; then
     echo "Couldn't find file \"$filename\""
     exit 1
   fi
-elif [ -z "$output" ]; then
-  echo "No output directory specified"
-  exit 1
 fi
 
 nprocs=${nprocs:-20}
+output=${output:-"$PWD"}
 reports="$output"/reports
 
 mkdir -p "$reports"
 
 if [ ! -z "$containerize" ]; then
-  [ "[]" == "$(docker inspect --type=image dirscour 2> /dev/null)" ] &&
-    docker build --no-cache -t dirscour .
-
   if [ -z "$filename" ]; then
     if [ -z "$wordlist" ]; then
       docker run \
@@ -140,8 +196,6 @@ elif [ -z "$dirsearch" ]; then
   exit 1
 fi
 
-
-dirscour="$(realpath "$(dirname "$0")")"
 tmp="$(mktemp -d)"
 lock="$tmp"/lock
 subdomains="$tmp"/subdomains
@@ -149,26 +203,20 @@ wordlist=${wordlist:-"$dirsearch"/db/dicc.txt}
 
 touch "$subdomains"
 
-cd "$dirscour"
-cat banner
+banner
 
-echo "[main] Starting daemon processes"
+log "[main] Starting scanner processes"
 
 for i in $(seq 1 "$nprocs"); do
-  dirsearch="$dirsearch" \
-  lock="$lock" \
-  reports="$reports" \
-  subdomains="$subdomains" \
-  wordlist="$wordlist" \
-  bash daemon.sh "$i" &
+  scanner "$i" &
 done
 
 if [ -z "$filename" ]; then
-  echo "[main] Starting subdomain discovery of \"$1\""
+  log "[main] Starting subdomain discovery of \"$1\""
   amass enum -passive -d "$1" >> "$subdomains" 2> /dev/null
-  echo "[main] Finished subdomain discovery"
+  log "[main] Finished subdomain discovery"
 else
-  echo "[main] Scanning domains in file"
+  log "[main] Scanning domains in file"
   cp "$filename" "$subdomains"
 fi
 
@@ -178,8 +226,8 @@ done
 
 wait
 
-echo "[main] Cleaning up"
+log "[main] Cleaning up"
 
 rm -rf "$tmp"
 
-echo "[main] Done!"
+log "[main] Done!"

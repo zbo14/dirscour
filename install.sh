@@ -2,4 +2,6 @@
 
 cd "$(dirname "$0")"
 
-sudo ln -s "$PWD"/dirscour /usr/local/bin
+docker build --no-cache -t dirscour .
+
+sudo cp dirscour /usr/local/bin
